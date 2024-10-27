@@ -3,52 +3,51 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.SceneManagement; // SceneManagerを追加
 
 public class WindowManager : MonoBehaviour
 {
     [SerializeField] GameObject nokori;
     [SerializeField] GameObject time;
     [SerializeField] GameObject clear;
-    [SerializeField] GameObject clear2;
-    [SerializeField] GameObject gameOverPanel1; // ゲームオーバーパネル
-    [SerializeField] GameObject gameOverPanel2; // ゲームオーバーパネル
-    [SerializeField] GameObject fieldObeject;
+    [SerializeField] GameObject gameOver;
+    [SerializeField] GameObject fieldObject;
     [SerializeField] GameObject gameCamera;
-    [SerializeField] GameObject startCamera; // スタートカメラ
+    [SerializeField] GameObject startCamera;
     [SerializeField] GameObject start;
-    [SerializeField] AudioSource audioSource; // AudioSourceを追加
-    [SerializeField] AudioSource BGM; // AudioSourceを追加
+    [SerializeField] AudioSource audioSource;
+    [SerializeField] AudioSource BGM;
     [SerializeField] AudioSource Clear;
     [SerializeField] AudioSource Gameover;
+    [SerializeField] ParticleSystem[] particleSystems; // 複数のパーティクルシステムを管理
 
     private int quantity = 0;
     private float downTime = 30.0f;
-    private bool gameActive = false; // 初期状態は非アクティブ
+    private bool gameActive = false;
 
-    // Start is called before the first frame update
-    void Start()
+    public void Start()
     {
-        nokori.GetComponent<TextMeshProUGUI>().text = quantity.ToString();
-        gameOverPanel1.SetActive(false); // ゲームオーバーパネルは最初は非表示
-        gameOverPanel2.SetActive(false);
-        gameCamera.SetActive(false);
         BGM.Play();
+        fieldObject.SetActive(true);
+        nokori.GetComponent<TextMeshProUGUI>().text = quantity.ToString();
+        start.SetActive(true);
+        clear.SetActive(false);
+        gameOver.SetActive(false);
+        startCamera.SetActive(true);
+        gameCamera.SetActive(false);
     }
 
-    // Update is called once per frame
     void Update()
     {
-        if (gameActive) // ゲームがアクティブな場合にのみダウンタイムを減少
+        if (gameActive)
         {
             gameCamera.SetActive(true);
-            startCamera.SetActive(false);
-            start.SetActive(false);
             downTime -= Time.deltaTime;
-            time.GetComponent<TextMeshProUGUI>().text = downTime.ToString("F2"); // 小数点以下2桁まで表示
+            time.GetComponent<TextMeshProUGUI>().text = downTime.ToString("F2");
 
-            // ダウンタイムが0以下になったら、ゲームオーバー処理を追加
-            if (downTime == 0)
+            if (downTime <= 0)
             {
+                gameActive = false;
                 GameOver();
             }
         }
@@ -56,68 +55,90 @@ public class WindowManager : MonoBehaviour
 
     public void Count()
     {
-        if (quantity < 10)
+        if (quantity < 11)
         {
             quantity += 1;
             nokori.GetComponent<TextMeshProUGUI>().text = quantity.ToString();
 
-            if (quantity == 9)
+            if (quantity == 10)
             {
+                gameCamera.SetActive(false);
+                startCamera.SetActive(true);
                 clear.SetActive(true);
-                clear2.SetActive(true);
                 HideOtherObjects();
-                StopGame(); // ゲームを停止するメソッドを呼び出す
+                StopGame();
                 BGM.Stop();
                 Clear.Play();
             }
         }
     }
 
-    public void StartGame() // ゲーム開始メソッド
+    public void StartGame()
     {
-        gameActive = true; // ゲームをアクティブにする
+        gameActive = true;
         gameCamera.SetActive(true);
         startCamera.SetActive(false);
-        downTime = 30.0f; // ダウンタイムをリセット
-        quantity = 0; // 数量をリセット
-        nokori.GetComponent<TextMeshProUGUI>().text = quantity.ToString(); // 数量表示を更新
-        // 音楽を再生
-        audioSource.Play(); // 音楽を再生する
+        start.SetActive(false);
+        downTime = 30.0f;
+        quantity = 0;
+        nokori.SetActive(true);
+        time.SetActive(true);
+        nokori.GetComponent<TextMeshProUGUI>().text = quantity.ToString();
+        audioSource.Play();
     }
 
     private IEnumerator StopMusicAfterTime(float timeToWait)
     {
-        yield return new WaitForSeconds(timeToWait); // 指定した時間待つ
-        audioSource.Stop(); // 音楽を停止
+        yield return new WaitForSeconds(timeToWait);
+        audioSource.Stop();
     }
 
     private void HideOtherObjects()
     {
-        // フィールドのオブジェクトを非表示にする
-        fieldObeject.SetActive(false);
-
-        // 他のオブジェクトを非表示にする
+        fieldObject.SetActive(false);
         nokori.SetActive(false);
         time.SetActive(false);
     }
 
     private void StopGame()
     {
-        gameActive = false; // ゲームを非アクティブにする
+        gameActive = false;
+
+        // すべてのパーティクルシステムを停止してクリア
+        foreach (var particle in particleSystems)
+        {
+            if (particle.isPlaying)
+            {
+                particle.Stop();
+                particle.Clear(); // パーティクルをクリア
+            }
+        }
     }
 
     private void GameOver()
     {
-        // ゲームオーバーの処理をここに追加
-        Debug.Log("Game Over!");
-
-        // ゲームオーバーパネルを表示
-        gameOverPanel1.SetActive(true);
-        gameOverPanel2.SetActive(true);
+        gameOver.SetActive(true);
+        gameCamera.SetActive(false);
+        startCamera.SetActive(true);
         Gameover.Play();
         BGM.Stop();
-
-        // フィールドのオブジェクトを非表示にする
         HideOtherObjects();
+
+        // ゲームオーバー時にもすべてのパーティクルシステムを停止
+        foreach (var particle in particleSystems)
+        {
+            if (particle.isPlaying)
+            {
+                particle.Stop();
+                particle.Clear(); // パーティクルをクリア
+            }
+        }
+    }
+
+    // ゲームをリセットするメソッド（シーンをリロード）
+    public void ResetGame()
+    {
+        // 現在のシーンを再ロード
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }
